@@ -1,7 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
-import cors from 'cors'; // Import CORS middleware
+import cors from 'cors';
+import dotenv from 'dotenv';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+
+dotenv.config();
 
 const app = express();
 app.set('trust proxy', 1);
