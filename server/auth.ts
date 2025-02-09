@@ -61,9 +61,7 @@ export function setupAuth(app: Express) {
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false);
         }
-        if (!user.verified) {
-          return done(null, false, { message: "Email not verified" });
-        }
+        // Remove verification check to allow unverified users to login
         return done(null, user);
       },
     ),
@@ -92,7 +90,11 @@ export function setupAuth(app: Express) {
       await sendVerificationEmail(user.email, verificationCode);
       await sendAdminNotification("new_user", user.email);
 
-      res.status(201).json({ message: "Verification email sent" });
+      // Log the user in immediately after registration
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.status(201).json(user);
+      });
     } catch (error) {
       next(error);
     }
@@ -108,10 +110,21 @@ export function setupAuth(app: Express) {
       }
 
       await storage.verifyUser(user.id);
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(200).json(user);
-      });
+      res.status(200).json({ message: "Email verified successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/resend-verification", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) return res.sendStatus(401);
+
+      const verificationCode = generateVerificationCode();
+      await storage.updateVerificationCode(req.user!.id, verificationCode);
+      await sendVerificationEmail(req.user!.email, verificationCode);
+
+      res.status(200).json({ message: "Verification code sent" });
     } catch (error) {
       next(error);
     }
@@ -126,43 +139,6 @@ export function setupAuth(app: Express) {
       if (err) return next(err);
       res.sendStatus(200);
     });
-  });
-
-  app.post("/api/forgot-password", async (req, res, next) => {
-    try {
-      const { email } = req.body;
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(400).send("Email not found");
-      }
-
-      const resetCode = generateVerificationCode();
-      const resetCodeExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-      await storage.setResetCode(user.id, resetCode, resetCodeExpiry);
-      await sendPasswordResetEmail(email, resetCode);
-      await sendAdminNotification("reset_request", email);
-
-      res.status(200).json({ message: "Reset code sent" });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post("/api/reset-password", async (req, res, next) => {
-    try {
-      const { email, code, password } = req.body;
-      const user = await storage.getUserByEmail(email);
-
-      if (!user || user.resetCode !== code || !user.resetCodeExpiry || user.resetCodeExpiry < new Date()) {
-        return res.status(400).send("Invalid or expired reset code");
-      }
-
-      await storage.updatePassword(user.id, await hashPassword(password));
-      res.status(200).json({ message: "Password updated" });
-    } catch (error) {
-      next(error);
-    }
   });
 
   app.get("/api/user", (req, res) => {

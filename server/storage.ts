@@ -22,6 +22,7 @@ export interface IStorage {
   getUserMessages(userId: number): Promise<Message[]>;
   saveMessage(userId: number, content: string, role: "user" | "assistant"): Promise<void>;
   sessionStore: session.Store;
+  updateVerificationCode(id: number, code: string): Promise<void>;
 }
 
 // PostgreSQL implementation
@@ -112,6 +113,12 @@ export class DatabaseStorage implements IStorage {
       userId,
       timestamp: new Date()
     });
+  }
+  async updateVerificationCode(id: number, code: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ verificationCode: code })
+      .where(sql`${users.id} = ${id}`);
   }
 }
 
@@ -210,6 +217,12 @@ export class MemStorage implements IStorage {
       timestamp: new Date(),
     });
     this.messages.set(userId, userMessages);
+  }
+  async updateVerificationCode(id: number, code: string): Promise<void> {
+    const user = await this.getUser(id);
+    if (user) {
+      user.verificationCode = code;
+    }
   }
 }
 
