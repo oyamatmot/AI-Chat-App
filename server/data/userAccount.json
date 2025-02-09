@@ -3,7 +3,7 @@
   "users": [
     {
       "email": "oyamatmot0812@gmail.com",
-      "password": "$2b$10$6jFJLTWtjcbHjJRrYxcPMeXHQ0QGlZCVGcXDuGHgv5qXDrEpRG5mG",
+      "password": "password123",
       "verified": true,
       "isAdmin": false
     }

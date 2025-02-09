@@ -24,7 +24,7 @@ export async function loadAccounts() {
 export async function saveAccount(email: string, password: string, isAdmin: boolean) {
   const newAccount = {
     email,
-    password, // Password stored as plain text
+    password,
     verified: false,
     isAdmin
   };
