@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ const verifySchema = z.object({
 
 export function AuthForms() {
   const [mode, setMode] = useState<Mode>("login");
+  const [showPassword, setShowPassword] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState("");
   const { toast } = useToast();
   const { loginMutation, registerMutation } = useAuth();
@@ -260,12 +262,25 @@ export function AuthForms() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="login-password">Password</Label>
-                <Input
-                  id="login-password"
-                  type="password"
-                  icon={<Lock className="h-4 w-4" />}
-                  {...loginForm.register("password")}
-                />
+                <div className="relative">
+                  <Input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    icon={<Lock className="h-4 w-4" />}
+                    {...loginForm.register("password")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                  >
+                    {showPassword ? (
+                      <Eye className="h-4 w-4" />
+                    ) : (
+                      <EyeOff className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <Button
                 type="submit"
