@@ -16,9 +16,8 @@ export async function sendVerificationEmail(email: string, code: string) {
     to: email,
     subject: "Verify your email",
     html: `
-      <h1>Welcome to AI Chat!</h1>
+      <h1>Email Verification</h1>
       <p>Your verification code is: <strong>${code}</strong></p>
-      <p>Enter this code to verify your account.</p>
     `,
   });
 }
@@ -27,36 +26,30 @@ export async function sendPasswordResetEmail(email: string, code: string) {
   await transporter.sendMail({
     from: process.env.GMAIL_USER,
     to: email,
-    subject: "Reset your password",
+    subject: "Password Reset Request",
     html: `
-      <h1>Password Reset Requested</h1>
+      <h1>Password Reset</h1>
       <p>Your password reset code is: <strong>${code}</strong></p>
-      <p>Enter this code to reset your password.</p>
+      <p>This code will expire in 1 hour.</p>
     `,
   });
 }
 
-export async function notifyAdminNewUser(username: string, email: string) {
-  await transporter.sendMail({
-    from: process.env.GMAIL_USER,
-    to: ADMIN_EMAIL,
-    subject: "New User Registration",
-    html: `
-      <h1>New User Registered</h1>
-      <p>Username: ${username}</p>
-      <p>Email: ${email}</p>
-    `,
-  });
-}
+export async function sendAdminNotification(type: "new_user" | "reset_request", email: string) {
+  const subjects = {
+    new_user: "New User Registration",
+    reset_request: "Password Reset Request",
+  };
 
-export async function notifyAdminPasswordReset(email: string) {
+  const messages = {
+    new_user: `A new user has registered with email: ${email}`,
+    reset_request: `A password reset was requested for user: ${email}`,
+  };
+
   await transporter.sendMail({
     from: process.env.GMAIL_USER,
     to: ADMIN_EMAIL,
-    subject: "Password Reset Requested",
-    html: `
-      <h1>Password Reset Requested</h1>
-      <p>User email: ${email}</p>
-    `,
+    subject: subjects[type],
+    text: messages[type],
   });
 }

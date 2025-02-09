@@ -1,49 +1,44 @@
-import { pgTable, text, serial, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
+  username: text("username").unique(),
   password: text("password").notNull(),
-  isVerified: boolean("is_verified").default(false),
+  verified: boolean("verified").default(false).notNull(),
   verificationCode: text("verification_code"),
   resetCode: text("reset_code"),
-  createdAt: timestamp("created_at").defaultNow(),
+  resetCodeExpiry: timestamp("reset_code_expiry"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
   userId: serial("user_id").references(() => users.id),
   content: text("content").notNull(),
-  isAi: boolean("is_ai").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
+  role: text("role", { enum: ["user", "assistant"] }).notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users)
   .pick({
-    username: true,
     email: true,
     password: true,
   })
   .extend({
     password: z.string().min(8),
-    email: z.string().email(),
   });
 
-export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
+export const updateUsernameSchema = z.object({
+  username: z.string().min(3).max(30),
 });
 
 export const resetPasswordSchema = z.object({
   email: z.string().email(),
-});
-
-export const verifyResetSchema = z.object({
-  code: z.string(),
-  newPassword: z.string().min(8),
+  code: z.string().optional(),
+  password: z.string().min(8).optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

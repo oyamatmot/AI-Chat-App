@@ -14,22 +14,22 @@ export function registerRoutes(app: Express): Server {
     if (!message) return res.status(400).send("Message is required");
 
     try {
-      const userMessage = await storage.createMessage({
-        userId: req.user.id,
-        content: message,
-        isAi: false,
-      });
+      const messages = await storage.getUserMessages(req.user!.id);
+      const chatHistory = messages.map(m => ({
+        role: m.role,
+        content: m.content
+      }));
 
-      const aiResponse = await generateChatResponse(message);
-      const aiMessage = await storage.createMessage({
-        userId: req.user.id,
-        content: aiResponse,
-        isAi: true,
-      });
+      chatHistory.push({ role: "user", content: message });
+      
+      const response = await generateChatResponse(chatHistory);
+      
+      await storage.saveMessage(req.user!.id, message, "user");
+      await storage.saveMessage(req.user!.id, response, "assistant");
 
-      res.json({ userMessage, aiMessage });
+      res.json({ response });
     } catch (error) {
-      res.status(500).json({ error: "Failed to process message" });
+      res.status(500).json({ error: "Failed to generate response" });
     }
   });
 
@@ -37,7 +37,7 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const messages = await storage.getUserMessages(req.user.id);
+      const messages = await storage.getUserMessages(req.user!.id);
       res.json(messages);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch chat history" });

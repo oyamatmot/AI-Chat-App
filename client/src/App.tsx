@@ -6,7 +6,6 @@ import { AuthProvider } from "./hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import ChatPage from "@/pages/chat-page";
-import ResetPassword from "@/pages/reset-password";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -14,7 +13,6 @@ function Router() {
     <Switch>
       <ProtectedRoute path="/" component={ChatPage} />
       <Route path="/auth" component={AuthPage} />
-      <Route path="/reset-password" component={ResetPassword} />
       <Route component={NotFound} />
     </Switch>
   );
