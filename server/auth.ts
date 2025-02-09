@@ -21,6 +21,8 @@ async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
+import bcrypt from 'bcrypt';
+
 async function comparePasswords(supplied: string, stored: string) {
   if (stored.startsWith('$2b$')) {
     return bcrypt.compare(supplied, stored);
