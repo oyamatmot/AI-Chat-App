@@ -11,7 +11,7 @@ export async function generateChatResponse(messages: { role: string; content: st
         content: msg.content
       })),
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 40000,
     });
 
     return response.choices[0].message.content;
