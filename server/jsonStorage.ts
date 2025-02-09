@@ -27,7 +27,7 @@ export async function saveAccount(email: string, password: string, isAdmin: bool
   const newAccount = {
     email,
     password: hashedPassword,
-    verified: true,
+    verified: false,
     isAdmin
   };
 
