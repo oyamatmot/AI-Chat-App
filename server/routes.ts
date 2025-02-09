@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { generateChatResponse } from "./openai";
 import { setupWebSocket } from "./websocket";
 import { rateLimit } from 'express-rate-limit';
+import { sendPasswordResetEmail } from "./email";
 
 export function registerRoutes(app: Express): Server {
   // Rate limiting
@@ -232,6 +233,24 @@ export function registerRoutes(app: Express): Server {
       res.json(messages);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch chat history" });
+    }
+  });
+
+  app.post("/api/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const resetCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      await storage.saveResetCode(email, resetCode);
+      await sendPasswordResetEmail(email, resetCode);
+
+      res.status(200).json({ message: "Reset code sent" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to process request" });
     }
   });
 

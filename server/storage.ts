@@ -9,9 +9,9 @@ import createMemoryStore from "memorystore";
 const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
-  getUser(id: number): Promise<User | undefined>;
-  getUserByEmail(email: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  getUser(id: number): Promise<User | null>;
+  getUserByEmail(email: string): Promise<User | null>;
+  getUserByUsername(username: string): Promise<User | null>;
   createUser(user: InsertUser & { verificationCode?: string }): Promise<User>;
   verifyUser(id: number): Promise<void>;
   updateUsername(id: number, username: string): Promise<void>;
@@ -41,7 +41,10 @@ export interface IStorage {
   getMessagesByTags(userId: number, tags: string[]): Promise<Message[]>;
   getFavoriteMessages(userId: number): Promise<Message[]>;
   updateUserTheme(userId: number, theme: string): Promise<void>;
+  saveResetCode(email: string, code: string): Promise<void>;
 }
+
+const resetCodes = new Map<string, { code: string; timestamp: number }>();
 
 export class DatabaseStorage implements IStorage {
   private db;
@@ -61,17 +64,17 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getUser(id: number): Promise<User | undefined> {
+  async getUser(id: number): Promise<User | null> {
     const [result] = await this.db.select().from(users).where(eq(users.id, id));
     return result;
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
+  async getUserByEmail(email: string): Promise<User | null> {
     const [result] = await this.db.select().from(users).where(eq(users.email, email));
     return result;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  async getUserByUsername(username: string): Promise<User | null> {
     const [result] = await this.db.select().from(users).where(eq(users.username, username));
     return result;
   }
@@ -263,6 +266,12 @@ export class DatabaseStorage implements IStorage {
       .set({ theme })
       .where(eq(users.id, userId));
   }
+
+  async saveResetCode(email: string, code: string): Promise<void> {
+    //  Implement persistent storage for reset codes here (e.g., database update).
+    // For now, it uses in-memory storage.  This is NOT suitable for production.
+    resetCodes.set(email, { code, timestamp: Date.now() });
+  }
 }
 
 // In-memory implementation for development
@@ -281,20 +290,16 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+  async getUser(id: number): Promise<User | null> {
+    return this.users.get(id) || null;
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email === email,
-    );
+  async getUserByEmail(email: string): Promise<User | null> {
+    return Array.from(this.users.values()).find((user) => user.email === email) || null;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+  async getUserByUsername(username: string): Promise<User | null> {
+    return Array.from(this.users.values()).find((user) => user.username === username) || null;
   }
 
   async getMessage(id: number): Promise<Message | undefined> {
@@ -484,6 +489,10 @@ export class MemStorage implements IStorage {
     if (user) {
       user.theme = theme;
     }
+  }
+
+  async saveResetCode(email: string, code: string): Promise<void> {
+    resetCodes.set(email, { code, timestamp: Date.now() });
   }
 }
 
