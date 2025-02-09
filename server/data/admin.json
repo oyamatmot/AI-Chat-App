@@ -1,0 +1,11 @@
+
+{
+  "admins": [
+    {
+      "email": "admin@example.com",
+      "password": "$2b$10$YourHashedPasswordHere",
+      "verified": true,
+      "isAdmin": true
+    }
+  ]
+}
