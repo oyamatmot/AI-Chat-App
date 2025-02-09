@@ -2,8 +2,8 @@
 {
   "users": [
     {
-      "email": "oyamatmot0812@gmail.com", 
-      "password": "$2b$0astoasto",
+      "email": "oyamatmot0812@gmail.com",
+      "password": "$2b$10$6jFJLTWtjcbHjJRrYxcPMeXHQ0QGlZCVGcXDuGHgv5qXDrEpRG5mG",
       "verified": true,
       "isAdmin": false
     }
