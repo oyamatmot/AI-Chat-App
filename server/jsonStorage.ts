@@ -3,7 +3,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import { IStorage } from './storage';
 import { User, Message, InsertUser } from '@shared/schema';
-import bcrypt from 'bcrypt';
 
 const ADMIN_FILE = path.join(__dirname, 'data', 'admin.json');
 const USER_FILE = path.join(__dirname, 'data', 'userAccount.json');
@@ -23,10 +22,9 @@ export async function loadAccounts() {
 }
 
 export async function saveAccount(email: string, password: string, isAdmin: boolean) {
-  const hashedPassword = await bcrypt.hash(password, 10);
   const newAccount = {
     email,
-    password: hashedPassword,
+    password, // Password stored as plain text
     verified: false,
     isAdmin
   };
