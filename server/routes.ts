@@ -7,6 +7,41 @@ import { generateChatResponse } from "./openai";
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
+  // Admin routes
+  const isAdmin = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated() || !req.user.isAdmin) {
+      return res.sendStatus(403);
+    }
+    next();
+  };
+
+  app.get("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/admin/users/:id/verify", isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { verified } = req.body;
+
+      if (verified) {
+        await storage.verifyUser(userId);
+      } else {
+        await storage.unverifyUser(userId);
+      }
+
+      res.json({ message: "User verification status updated" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user verification status" });
+    }
+  });
+
+  // Chat routes
   app.post("/api/chat", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 

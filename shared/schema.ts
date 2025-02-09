@@ -8,6 +8,7 @@ export const users = pgTable("users", {
   username: text("username").unique(),
   password: text("password").notNull(),
   verified: boolean("verified").default(false).notNull(),
+  isAdmin: boolean("is_admin").default(false).notNull(),
   verificationCode: text("verification_code"),
   resetCode: text("reset_code"),
   resetCodeExpiry: timestamp("reset_code_expiry"),
