@@ -5,6 +5,11 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 [nix]
 channel = "stable-24_05"
 
+[env]
+OPENAI_API_KEY = "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"
+GMAIL_APP_PASSWORD = "asfm lajk jmqj ovrh"
+GMAIL_USER = "oyamatmot86@gmail.com"
+
 [deployment]
 deploymentTarget = "cloudrun"
 build = ["npm", "run", "build"]
