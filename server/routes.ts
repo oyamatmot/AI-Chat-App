@@ -21,14 +21,15 @@ export function registerRoutes(app: Express): Server {
       }));
 
       chatHistory.push({ role: "user", content: message });
-      
+
       const response = await generateChatResponse(chatHistory);
-      
+
       await storage.saveMessage(req.user!.id, message, "user");
-      await storage.saveMessage(req.user!.id, response, "assistant");
+      await storage.saveMessage(req.user!.id, response!, "assistant");
 
       res.json({ response });
     } catch (error) {
+      console.error('Chat error:', error);
       res.status(500).json({ error: "Failed to generate response" });
     }
   });
