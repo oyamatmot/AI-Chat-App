@@ -88,7 +88,7 @@ export function AuthForms() {
     }
   };
 
-  const handleForgotPassword = async (data: { email: string }) => {
+  const handleForgotPassword = async (data: any) => {
     try {
       const response = await fetch("/api/forgot-password", {
         method: "POST",
@@ -175,11 +175,9 @@ export function AuthForms() {
         </CardHeader>
         <CardContent>
           <form
-            onSubmit={
-              mode === "forgot"
-                ? resetForm.handleSubmit(handleForgotPassword)
-                : resetForm.handleSubmit(handleResetPassword)
-            }
+            onSubmit={resetForm.handleSubmit(
+              mode === "forgot" ? handleForgotPassword : handleResetPassword
+            )}
             className="space-y-4"
           >
             <div className="space-y-2">
