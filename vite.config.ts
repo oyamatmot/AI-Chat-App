@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [react()],
+  root: './client',
   server: {
     host: "0.0.0.0",
     hmr: {
