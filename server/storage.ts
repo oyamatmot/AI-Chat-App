@@ -1,7 +1,7 @@
-import { sql } from 'drizzle-orm';
+import { sql, eq, desc } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 import { users, type User, type InsertUser, messages, type Message } from "@shared/schema";
-import * as pg from '@neondatabase/serverless';
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import createMemoryStore from "memorystore";
@@ -15,22 +15,22 @@ export interface IStorage {
   createUser(user: InsertUser & { verificationCode?: string }): Promise<User>;
   verifyUser(id: number): Promise<void>;
   updateUsername(id: number, username: string): Promise<void>;
-  setResetCode(id: number, code: string, expiry: Date): Promise<void>;
+  updateVerificationCode(id: number, code: string): Promise<void>;
+  getAllUsers(): Promise<User[]>;
+  unverifyUser(id: number): Promise<void>;
+  sessionStore: session.Store;
   updatePassword(id: number, password: string): Promise<void>;
+  setResetCode(id: number, code: string, expiry: Date): Promise<void>;
   getUserMessages(userId: number): Promise<Message[]>;
   getMessage(id: number): Promise<Message | undefined>;
   saveMessage(
     userId: number,
     content: string,
     role: "user" | "assistant",
-    contentType?: "text" | "code" | "file",
-    tags?: string[],
-    metadata?: Record<string, unknown>
+    contentType: "text" | "code" | "file",
+    tags: string[],
+    metadata: Record<string, unknown>
   ): Promise<Message>;
-  sessionStore: session.Store;
-  updateVerificationCode(id: number, code: string): Promise<void>;
-  getAllUsers(): Promise<User[]>;
-  unverifyUser(id: number): Promise<void>;
   editMessage(id: number, content: string): Promise<void>;
   deleteMessage(id: number): Promise<void>;
   toggleFavoriteMessage(id: number): Promise<void>;
@@ -44,13 +44,13 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  private pool;
   private db;
+  private client;
   sessionStore: session.Store;
 
   constructor() {
-    this.pool = pg.neon(process.env.DATABASE_URL!);
-    this.db = drizzle(this.pool);
+    this.client = postgres(process.env.DATABASE_URL!);
+    this.db = drizzle(this.client);
 
     const PostgresStore = connectPg(session);
     this.sessionStore = new PostgresStore({
@@ -62,35 +62,89 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(sql`${users.id} = ${id}`);
-    return result[0];
+    const [result] = await this.db.select().from(users).where(eq(users.id, id));
+    return result;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(sql`${users.email} = ${email}`);
-    return result[0];
+    const [result] = await this.db.select().from(users).where(eq(users.email, email));
+    return result;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(sql`${users.username} = ${username}`);
-    return result[0];
-  }
-
-  async getMessage(id: number): Promise<Message | undefined> {
-    const result = await this.db.select().from(messages).where(sql`${messages.id} = ${id}`);
-    return result[0];
+    const [result] = await this.db.select().from(users).where(eq(users.username, username));
+    return result;
   }
 
   async createUser(user: InsertUser & { verificationCode?: string }): Promise<User> {
-    const result = await this.db.insert(users).values({
+    const [result] = await this.db.insert(users).values({
       email: user.email,
       password: user.password,
       verificationCode: user.verificationCode,
       verified: false,
+      isAdmin: false,
       createdAt: new Date(),
       theme: "system",
     }).returning();
-    return result[0];
+    return result;
+  }
+
+  async verifyUser(id: number): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ verified: true, verificationCode: null })
+      .where(eq(users.id, id));
+  }
+
+  async updateUsername(id: number, username: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ username })
+      .where(eq(users.id, id));
+  }
+
+  async updateVerificationCode(id: number, code: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ verificationCode: code })
+      .where(eq(users.id, id));
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await this.db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async unverifyUser(id: number): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ verified: false })
+      .where(eq(users.id, id));
+  }
+  async updatePassword(id: number, password: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ password, resetCode: null, resetCodeExpiry: null })
+      .where(eq(users.id, id));
+  }
+
+  async setResetCode(id: number, code: string, expiry: Date): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ resetCode: code, resetCodeExpiry: expiry })
+      .where(eq(users.id, id));
+  }
+
+  async getUserMessages(userId: number): Promise<Message[]> {
+    return await this.db
+      .select()
+      .from(messages)
+      .where(eq(messages.userId, userId))
+      .orderBy(asc(messages.timestamp));
+  }
+
+  async getMessage(id: number): Promise<Message | undefined> {
+    const [result] = await this.db.select().from(messages).where(eq(messages.id, id));
+    return result;
   }
 
   async saveMessage(
@@ -101,7 +155,7 @@ export class DatabaseStorage implements IStorage {
     tags: string[] = [],
     metadata: Record<string, unknown> = {}
   ): Promise<Message> {
-    const result = await this.db.insert(messages).values({
+    const [result] = await this.db.insert(messages).values({
       userId,
       content,
       role,
@@ -109,86 +163,38 @@ export class DatabaseStorage implements IStorage {
       tags,
       metadata,
       timestamp: new Date(),
+      edited: false,
+      editHistory: [],
+      deleted: false,
+      favorite: false,
+      reactions: {count: 0, users: []},
     }).returning();
-    return result[0];
-  }
-
-  async verifyUser(id: number): Promise<void> {
-    await this.db
-      .update(users)
-      .set({ verified: true, verificationCode: null })
-      .where(sql`${users.id} = ${id}`);
-  }
-
-  async updateUsername(id: number, username: string): Promise<void> {
-    await this.db
-      .update(users)
-      .set({ username })
-      .where(sql`${users.id} = ${id}`);
-  }
-
-  async setResetCode(id: number, code: string, expiry: Date): Promise<void> {
-    await this.db
-      .update(users)
-      .set({ resetCode: code, resetCodeExpiry: expiry })
-      .where(sql`${users.id} = ${id}`);
-  }
-
-  async updatePassword(id: number, password: string): Promise<void> {
-    await this.db
-      .update(users)
-      .set({ password, resetCode: null, resetCodeExpiry: null })
-      .where(sql`${users.id} = ${id}`);
-  }
-
-  async getUserMessages(userId: number): Promise<Message[]> {
-    return await this.db
-      .select()
-      .from(messages)
-      .where(sql`${messages.userId} = ${userId}`)
-      .orderBy(sql`${messages.timestamp} asc`);
-  }
-
-  async updateVerificationCode(id: number, code: string): Promise<void> {
-    await this.db
-      .update(users)
-      .set({ verificationCode: code })
-      .where(sql`${users.id} = ${id}`);
-  }
-  async getAllUsers(): Promise<User[]> {
-    return await this.db.select().from(users).orderBy(sql`${users.createdAt} desc`);
-  }
-
-  async unverifyUser(id: number): Promise<void> {
-    await this.db
-      .update(users)
-      .set({ verified: false })
-      .where(sql`${users.id} = ${id}`);
+    return result;
   }
 
   async editMessage(id: number, content: string): Promise<void> {
-    const message = await this.db
+    await this.db
       .update(messages)
       .set({ 
         content,
         edited: true,
-        editHistory: sql`array_append(${messages.editHistory}, jsonb_build_object('timestamp', now(), 'content', ${messages.content}))`
+        editHistory: sql`array_append(${messages.editHistory}, jsonb_build_object('timestamp', now(), 'content', ${content}))`
       })
-      .where(sql`${messages.id} = ${id}`);
+      .where(eq(messages.id, id));
   }
 
   async deleteMessage(id: number): Promise<void> {
     await this.db
       .update(messages)
       .set({ deleted: true })
-      .where(sql`${messages.id} = ${id}`);
+      .where(eq(messages.id, id));
   }
 
   async toggleFavoriteMessage(id: number): Promise<void> {
     await this.db
       .update(messages)
       .set({ favorite: sql`NOT ${messages.favorite}` })
-      .where(sql`${messages.id} = ${id}`);
+      .where(eq(messages.id, id));
   }
 
   async addMessageReaction(id: number, userId: number, reaction: string): Promise<void> {
@@ -201,7 +207,7 @@ export class DatabaseStorage implements IStorage {
           (COALESCE((${messages.reactions}->>'count')::int, 0) + 1)::text::jsonb
         )`
       })
-      .where(sql`${messages.id} = ${id}`);
+      .where(eq(messages.id, id));
   }
 
   async removeMessageReaction(id: number, userId: number, reaction: string): Promise<void> {
@@ -214,7 +220,7 @@ export class DatabaseStorage implements IStorage {
           (GREATEST(COALESCE((${messages.reactions}->>'count')::int, 0) - 1, 0))::text::jsonb
         )`
       })
-      .where(sql`${messages.id} = ${id}`);
+      .where(eq(messages.id, id));
   }
 
   async searchMessages(userId: number, query: string): Promise<Message[]> {
@@ -222,7 +228,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(messages)
       .where(sql`${messages.userId} = ${userId} AND ${messages.content} ILIKE ${`%${query}%`}`)
-      .orderBy(sql`${messages.timestamp} desc`);
+      .orderBy(desc(messages.timestamp));
   }
 
   async getMessagesByDateRange(userId: number, startDate: Date, endDate: Date): Promise<Message[]> {
@@ -232,7 +238,7 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${messages.userId} = ${userId} 
         AND ${messages.timestamp} >= ${startDate} 
         AND ${messages.timestamp} <= ${endDate}`)
-      .orderBy(sql`${messages.timestamp} desc`);
+      .orderBy(desc(messages.timestamp));
   }
 
   async getMessagesByTags(userId: number, tags: string[]): Promise<Message[]> {
@@ -240,7 +246,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(messages)
       .where(sql`${messages.userId} = ${userId} AND ${messages.tags} && ${tags}`)
-      .orderBy(sql`${messages.timestamp} desc`);
+      .orderBy(desc(messages.timestamp));
   }
 
   async getFavoriteMessages(userId: number): Promise<Message[]> {
@@ -248,14 +254,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(messages)
       .where(sql`${messages.userId} = ${userId} AND ${messages.favorite} = true`)
-      .orderBy(sql`${messages.timestamp} desc`);
+      .orderBy(desc(messages.timestamp));
   }
 
   async updateUserTheme(userId: number, theme: string): Promise<void> {
     await this.db
       .update(users)
       .set({ theme })
-      .where(sql`${users.id} = ${userId}`);
+      .where(eq(users.id, userId));
   }
 }
 
@@ -304,11 +310,12 @@ export class MemStorage implements IStorage {
       password: insertUser.password,
       username: null,
       verified: false,
+      isAdmin: false,
       verificationCode: insertUser.verificationCode || null,
       resetCode: null,
       resetCodeExpiry: null,
       createdAt: new Date(),
-      theme: "system", //added theme
+      theme: "system", 
     };
     this.users.set(id, user);
     return user;
@@ -484,3 +491,4 @@ export class MemStorage implements IStorage {
 export const storage = process.env.NODE_ENV === 'production'
   ? new DatabaseStorage()
   : new MemStorage();
+import {asc} from 'drizzle-orm';

@@ -1,6 +1,7 @@
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
 import type { Server } from 'http';
 import type { Message } from '@shared/schema';
+import WebSocket from 'ws';
 
 interface WebSocketClient extends WebSocket {
   userId?: number;
@@ -19,7 +20,7 @@ export function setupWebSocket(server: Server) {
   // Store client connections
   const clients = new Map<number, Set<WebSocketClient>>();
 
-  const broadcast = (userId: number, event: string, data: any) => {
+  const broadcast = (userId: number, event: string, data: unknown) => {
     const userClients = clients.get(userId);
     if (userClients) {
       const message = JSON.stringify({ event, data });
@@ -64,7 +65,7 @@ export function setupWebSocket(server: Server) {
 
     ws.on('pong', () => heartbeat(ws));
 
-    ws.on('message', async (data: WebSocket.RawData) => {
+    ws.on('message', async (data: Buffer) => {
       try {
         const message = JSON.parse(data.toString()) as WSMessage;
 

@@ -6,7 +6,6 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
-import { sendVerificationEmail, sendPasswordResetEmail, sendAdminNotification } from "./email";
 
 declare global {
   namespace Express {
@@ -27,10 +26,6 @@ async function comparePasswords(supplied: string, stored: string) {
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(hashedBuf, suppliedBuf);
-}
-
-function generateVerificationCode() {
-  return randomBytes(3).toString("hex").toUpperCase();
 }
 
 export function setupAuth(app: Express) {
@@ -56,7 +51,7 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(
       { usernameField: "email" },
-      async (email, password, done) => {
+      async (email: string, password: string, done: Function) => {
         try {
           const user = await storage.getUserByEmail(email);
           if (!user || !(await comparePasswords(password, user.password))) {
@@ -90,15 +85,10 @@ export function setupAuth(app: Express) {
         return res.status(400).send("Email already registered");
       }
 
-      const verificationCode = generateVerificationCode();
       const user = await storage.createUser({
         ...req.body,
         password: await hashPassword(req.body.password),
-        verificationCode,
       });
-
-      await sendVerificationEmail(user.email, verificationCode);
-      await sendAdminNotification("new_user", user.email);
 
       req.login(user, (err) => {
         if (err) return next(err);
@@ -109,47 +99,20 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/verify", async (req, res, next) => {
-    try {
-      const { email, code } = req.body;
-      const user = await storage.getUserByEmail(email);
-
-      if (!user || user.verificationCode !== code) {
-        return res.status(400).send("Invalid verification code");
-      }
-
-      await storage.verifyUser(user.id);
-      res.status(200).json({ message: "Email verified successfully" });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post("/api/resend-verification", async (req, res, next) => {
-    try {
-      if (!req.isAuthenticated()) return res.sendStatus(401);
-
-      const verificationCode = generateVerificationCode();
-      await storage.updateVerificationCode(req.user!.id, verificationCode);
-      await sendVerificationEmail(req.user!.email, verificationCode);
-
-      res.status(200).json({ message: "Verification code sent" });
-    } catch (error) {
-      next(error);
-    }
-  });
-
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
-      if (err) return next(err);
-      if (!user) {
-        return res.status(401).json({ message: info?.message || "Login failed" });
-      }
-      req.login(user, (err) => {
+    passport.authenticate(
+      "local",
+      (err: Error | null, user: SelectUser | false, info: { message: string } | undefined) => {
         if (err) return next(err);
-        res.status(200).json(user);
-      });
-    })(req, res, next);
+        if (!user) {
+          return res.status(401).json({ message: info?.message || "Login failed" });
+        }
+        req.login(user, (err) => {
+          if (err) return next(err);
+          res.status(200).json(user);
+        });
+      },
+    )(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -163,7 +126,6 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     res.json(req.user);
   });
-
   app.post("/api/username", async (req, res, next) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {

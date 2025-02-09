@@ -2,9 +2,9 @@
 {
   "users": [
     {
-      "email": "user@example.com", 
-      "password": "$2b$10$YourHashedPasswordHere",
-      "verified": true,
+      "email": "oyamatmot0812@gmail.com", 
+      "password": "0Astoasto",
+      "verified": false,
       "isAdmin": false
     }
   ]

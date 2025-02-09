@@ -9,7 +9,6 @@
   "cardForeground": "hsl(222.2, 84%, 4.9%)",
   "popover": "hsl(0, 0%, 100%)",
   "popoverForeground": "hsl(222.2, 84%, 4.9%)",
-  "primary": "hsl(224, 82%, 56%)",
   "primaryForeground": "hsl(210, 40%, 98%)",
   "secondary": "hsl(220, 14.3%, 95.9%)",
   "secondaryForeground": "hsl(222.2, 47.4%, 11.2%)",
